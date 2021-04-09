@@ -1,12 +1,10 @@
 import os
 import sys
-import math
-import time
+
 import logging
 import sys
 import argparse
 import torch
-import glob
 from torch.autograd import Variable
 from torchvision import transforms, datasets
 from new_layers import self_conv
@@ -16,11 +14,10 @@ from model import resnet18
 import utils
 from utils import adjust_learning_rate, save_checkpoint
 import numpy as np
-from random import shuffle
 
 
 parser = argparse.ArgumentParser("ImageNet")
-parser.add_argument('--batch_size', type=int, default=256, help='batch size')
+parser.add_argument('--batch_size', type=int, default=64, help='batch size')
 parser.add_argument('--learning_rate', type=float, default=0.05, help='init learning rate')
 parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 parser.add_argument('--weight_decay', type=float, default=0.0001, help='weight decay')
@@ -37,6 +34,8 @@ parser.add_argument('--learning_step', type=list, default=[25,35,40], help='lear
 
 
 args = parser.parse_args()
+from ninpy.datasets import load_toy_dataset, get_cifar10_transforms
+
 
 log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
@@ -49,54 +48,22 @@ logging.getLogger().addHandler(fh)
 
 
 def main():
-
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-
-
-# Image Preprocessing 
-    train_transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,])
-
-    test_transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,])
-
-
     num_epochs = args.epochs
     batch_size = args.batch_size
 
-    train_dataset = datasets.folder.ImageFolder(root='/fast/users/a1675776/data/imagenet/train/', transform=train_transform)
-    test_dataset = datasets.folder.ImageFolder(root='/fast/users/a1675776/data/imagenet/val/', transform=test_transform)    
-
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=batch_size, 
-                                           shuffle=True, num_workers=10, pin_memory=True)
-
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=batch_size, 
-                                          shuffle=False, num_workers=10, pin_memory=True)
-
-    
-
-
-    num_train = train_dataset.__len__()
-    n_train_batches = math.floor(num_train / batch_size)
-
+    train_transforms, test_transforms = get_cifar10_transforms()
+    train_loader, test_loader = load_toy_dataset(
+        batch_size, batch_size, 8, 'cifar10', './dataset', True,
+        train_transforms, test_transforms)
 
     criterion = nn.CrossEntropyLoss().cuda()
     bitW = 32
     bitA = 32
     model = resnet18(bitW, bitA)
-    model = utils.dataparallel(model, 3)
+    #model = utils.dataparallel(model, 3)
 
 
-    print("Compilation complete, starting training...")   
+    print("Compilation complete, starting training...")
 
     test_record = []
     train_record = []
@@ -114,13 +81,14 @@ def main():
             torch.nn.init.xavier_uniform(m.weight)
         elif isinstance(m, nn.BatchNorm2d):
             m.weight.data = m.weight.data.zero_().add(1.0)
+    model = model.cuda()
 
 
     while epoch < num_epochs:
 
         epoch = epoch + 1
-    # resume training    
-        if (args.resume_train) and (epoch == 1):   
+    # resume training
+        if (args.resume_train) and (epoch == 1):
             checkpoint = torch.load(args.resume_dir)
             epoch = checkpoint['epoch']
             learning_rate = checkpoint['learning_rate']
@@ -138,7 +106,7 @@ def main():
         train_acc_top1, train_acc_top5, train_obj = train(train_loader, model, criterion, optimizer)
         logging.info('train_acc %f', train_acc_top1)
         train_record.append([train_acc_top1, train_acc_top5])
-        np.save(args.weights_dir + 'train_record.npy', train_record)   
+        np.save(args.weights_dir + 'train_record.npy', train_record)
 
     # test
         test_acc_top1, test_acc_top5, test_obj = infer(test_loader, model, criterion)
@@ -214,7 +182,7 @@ def infer(valid_queue, model, criterion):
 
             logits = model(input)
             loss = criterion(logits, target)
- 
+
             prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
             n = input.size(0)
             objs.update(loss.item(), n)
@@ -225,9 +193,9 @@ def infer(valid_queue, model, criterion):
                 logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
     return top1.avg, top5.avg, objs.avg
- 
+
 
 if __name__ == '__main__':
-    utils.create_folder(args)       
+    utils.create_folder(args)
     main()
 

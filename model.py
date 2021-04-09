@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from new_layers import new_conv, self_conv, Q_A
 import torch.nn.init as init
-
+import torch.nn.functional as F
 
 
 def conv3x3(in_planes, out_planes, bitW, stride=1):
@@ -131,14 +131,15 @@ class ResNet(nn.Module):
         self.bitW = bitW
         self.bitA = bitA        
         super(ResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0], add_gate=False)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)  #don't quantize the last layer
-        self.avgpool = nn.AvgPool2d(7)
+        #self.avgpool = nn.AvgPool2d(7)
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
 
@@ -159,12 +160,12 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = self.maxpool(x)
+        #x = self.maxpool(x)
         x = self.bn1(x)
 
         sep_out = None
         sum_out = x
-        for layer in self.layer1: 
+        for layer in self.layer1:
             sep_out, sum_out = layer(sep_out, sum_out)
 
         for layer in self.layer2:
@@ -176,7 +177,8 @@ class ResNet(nn.Module):
         for layer in self.layer4:
             sep_out, sum_out = layer(sep_out, sum_out)
 
-        out = self.avgpool(sum_out)
+        #out = self.avgpool(sum_out)
+        out = F.avg_pool2d(sum_out, 4)
         out = out.view(out.size(0), -1)
         out = self.fc(out)
 

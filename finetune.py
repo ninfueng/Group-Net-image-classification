@@ -14,13 +14,14 @@ import torch.nn.functional as F
 from read_data import MyDataset
 from model import resnet18
 import utils
-from utils import adjust_learning_rate
+from utils import adjust_learning_rate, save_checkpoint
 import numpy as np
 from random import shuffle
+from ninpy.datasets import load_toy_dataset, get_cifar10_transforms
 
 
 parser = argparse.ArgumentParser("ImageNet")
-parser.add_argument('--batch_size', type=int, default=256, help='batch size')
+parser.add_argument('--batch_size', type=int, default=64, help='batch size')
 parser.add_argument('--learning_rate', type=float, default=5e-4, help='init learning rate')
 parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 parser.add_argument('--weight_decay', type=float, default=0.0001, help='weight decay')
@@ -50,53 +51,26 @@ logging.getLogger().addHandler(fh)
 
 def main():
 
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-
-
-# Image Preprocessing 
-    train_transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,])
-
-    test_transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,])
-
-
     num_epochs = args.epochs
     batch_size = args.batch_size
 
-    train_dataset = datasets.folder.ImageFolder(root='/usr/local/data/imagenet/train/', transform=train_transform)
-    test_dataset = datasets.folder.ImageFolder(root='/usr/local/data/imagenet/val/', transform=test_transform)    
+    train_transforms, test_transforms = get_cifar10_transforms()
+    train_loader, test_loader = load_toy_dataset(batch_size, batch_size, 8, 'cifar10', './dataset', True, train_transforms, test_transforms)
 
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=batch_size, 
-                                           shuffle=True, num_workers=10, pin_memory=True)
-
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=64, 
-                                          shuffle=False, num_workers=10, pin_memory=True)
-
-    
-
-
-    num_train = train_dataset.__len__()
-    n_train_batches = math.floor(num_train / batch_size)
+    #num_train = train_dataset.__len__()
+    #n_train_batches = math.floor(num_train / batch_size)
 
 
     criterion = nn.CrossEntropyLoss().cuda()
     bitW = 1
     bitA = 1
     model = resnet18(bitW, bitA, pretrained=True)
-    model = utils.dataparallel(model, 4)
+    model = model.cuda()
+
+    #model = utils.dataparallel(model, 4)
 
 
-    print("Compilation complete, starting training...")   
+    print("Compilation complete, starting training...")
 
     test_record = []
     train_record = []
