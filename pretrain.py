@@ -1,6 +1,7 @@
 import os
 import sys
 
+from tqdm import tqdm
 import logging
 import sys
 import argparse
@@ -14,28 +15,26 @@ from model import resnet18
 import utils
 from utils import adjust_learning_rate, save_checkpoint
 import numpy as np
-
+from multiprocessing import cpu_count
+from ninpy.datasets import load_toy_dataset, get_cifar10_transforms
 
 parser = argparse.ArgumentParser("ImageNet")
-parser.add_argument('--batch_size', type=int, default=64, help='batch size')
+parser.add_argument('--batch_size', type=int, default=256, help='batch size')
 parser.add_argument('--learning_rate', type=float, default=0.05, help='init learning rate')
 parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 parser.add_argument('--weight_decay', type=float, default=0.0001, help='weight decay')
 parser.add_argument('--report_freq', type=float, default=100, help='report frequency')
-parser.add_argument('--epochs', type=int, default=40, help='num of training epochs')
+parser.add_argument('--epochs', type=int, default=150, help='num of training epochs')
 parser.add_argument('--save', type=str, default='EXP', help='experiment name')
-parser.add_argument('--seed', type=int, default=2, help='random seed')
+parser.add_argument('--seed', type=int, default=2021, help='random seed')
 parser.add_argument('--grad_clip', type=float, default=10, help='gradient clipping')
 parser.add_argument('--resume_train', action='store_true', default=False, help='resume training')
 parser.add_argument('--resume_dir', type=str, default='./weights/checkpoint.pth.tar', help='save weights directory')
-parser.add_argument('--load_epoch', type=int, default=30, help='random seed')
+parser.add_argument('--load_epoch', type=int, default=2021, help='random seed')
 parser.add_argument('--weights_dir', type=str, default='./weights/', help='save weights directory')
-parser.add_argument('--learning_step', type=list, default=[25,35,40], help='learning rate steps')
-
-
+parser.add_argument('--learning_step', type=list, default=[50, 150], help='learning rate steps')
+parser.add_argument('--num_worker', type=int, default=cpu_count(), help='num worker')
 args = parser.parse_args()
-from ninpy.datasets import load_toy_dataset, get_cifar10_transforms
-
 
 log_format = '%(asctime)s %(message)s'
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
@@ -46,7 +45,6 @@ fh = logging.FileHandler(os.path.join(args.save, 'log.txt'))
 fh.setFormatter(logging.Formatter(log_format))
 logging.getLogger().addHandler(fh)
 
-
 def main():
     num_epochs = args.epochs
     batch_size = args.batch_size
@@ -55,7 +53,6 @@ def main():
     train_loader, test_loader = load_toy_dataset(
         batch_size, batch_size, 8, 'cifar10', './dataset', True,
         train_transforms, test_transforms)
-
     criterion = nn.CrossEntropyLoss().cuda()
     bitW = 32
     bitA = 32
@@ -83,9 +80,8 @@ def main():
             m.weight.data = m.weight.data.zero_().add(1.0)
     model = model.cuda()
 
-
+    pbar = tqdm(total=num_epochs - epoch)
     while epoch < num_epochs:
-
         epoch = epoch + 1
     # resume training
         if (args.resume_train) and (epoch == 1):
@@ -132,7 +128,7 @@ def main():
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = learning_rate
-
+        pbar.update(1)
 
 def train(train_queue, model, criterion, optimizer):
 
@@ -162,8 +158,7 @@ def train(train_queue, model, criterion, optimizer):
         top1.update(prec1.item(), n)
         top5.update(prec5.item(), n)
 
-        if step % args.report_freq == 0:
-            logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
+    logging.info('train %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
 
     return top1.avg, top5.avg, objs.avg
 
@@ -189,9 +184,7 @@ def infer(valid_queue, model, criterion):
             top1.update(prec1.item(), n)
             top5.update(prec5.item(), n)
 
-            if step % args.report_freq == 0:
-                logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
-
+    logging.info('valid %03d %e %f %f', step, objs.avg, top1.avg, top5.avg)
     return top1.avg, top5.avg, objs.avg
 
 
