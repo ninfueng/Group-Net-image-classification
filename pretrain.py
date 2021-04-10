@@ -48,7 +48,6 @@ logging.getLogger().addHandler(fh)
 def main():
     num_epochs = args.epochs
     batch_size = args.batch_size
-
     train_transforms, test_transforms = get_cifar10_transforms()
     train_loader, test_loader = load_toy_dataset(
         batch_size, batch_size, 8, 'cifar10', './dataset', True,
@@ -123,8 +122,8 @@ def main():
                 'learning_rate': learning_rate,
                 }, args, is_best)
 
-        step_idx, learning_rate = utils.adjust_learning_rate(args, epoch, step_idx,
-                                           learning_rate)
+        step_idx, learning_rate = utils.adjust_learning_rate(
+            args, epoch, step_idx, learning_rate)
 
         for param_group in optimizer.param_groups:
             param_group['lr'] = learning_rate
@@ -139,11 +138,10 @@ def train(train_queue, model, criterion, optimizer):
     model.train()
 
     for step, (input, target) in enumerate(train_queue):
-   
+
         n = input.size(0)
         input = input.cuda()
         target = target.cuda()
-
 
         logits = model(input)
         loss = criterion(logits, target)
