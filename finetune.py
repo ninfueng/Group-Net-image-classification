@@ -21,11 +21,11 @@ from ninpy.datasets import load_toy_dataset, get_cifar10_transforms
 
 
 parser = argparse.ArgumentParser("ImageNet")
-parser.add_argument('--batch_size', type=int, default=64, help='batch size')
+parser.add_argument('--batch_size', type=int, default=256, help='batch size')
 parser.add_argument('--learning_rate', type=float, default=5e-4, help='init learning rate')
 parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 parser.add_argument('--weight_decay', type=float, default=0.0001, help='weight decay')
-parser.add_argument('--report_freq', type=float, default=100, help='report frequency')
+parser.add_argument('--report_freq', type=float, default=300, help='report frequency')
 parser.add_argument('--epochs', type=int, default=40, help='num of training epochs')
 parser.add_argument('--save', type=str, default='EXP', help='experiment name')
 parser.add_argument('--seed', type=int, default=2, help='random seed')
