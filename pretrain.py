@@ -20,9 +20,9 @@ from ninpy.datasets import load_toy_dataset, get_cifar10_transforms
 
 parser = argparse.ArgumentParser("ImageNet")
 parser.add_argument('--batch_size', type=int, default=256, help='batch size')
-parser.add_argument('--learning_rate', type=float, default=0.05, help='init learning rate')
+parser.add_argument('--learning_rate', type=float, default=0.01, help='init learning rate')
 parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
-parser.add_argument('--weight_decay', type=float, default=0.0001, help='weight decay')
+parser.add_argument('--weight_decay', type=float, default=4e-5, help='weight decay')
 parser.add_argument('--report_freq', type=float, default=300, help='report frequency')
 parser.add_argument('--epochs', type=int, default=150, help='num of training epochs')
 parser.add_argument('--save', type=str, default='EXP', help='experiment name')
@@ -50,7 +50,7 @@ def main():
     batch_size = args.batch_size
     train_transforms, test_transforms = get_cifar10_transforms()
     train_loader, test_loader = load_toy_dataset(
-        batch_size, batch_size, 8, 'cifar10', './dataset', True,
+        batch_size, batch_size, cpu_count(), 'cifar10', './dataset', True,
         train_transforms, test_transforms)
     criterion = nn.CrossEntropyLoss().cuda()
     bitW = 32
